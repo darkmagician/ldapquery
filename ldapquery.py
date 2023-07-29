@@ -2,6 +2,8 @@ from ldap3 import Server, Connection, ALL
 from flask import request
 from flask import jsonify
 from flask import Flask
+from flask import json
+
 import os
 
 
