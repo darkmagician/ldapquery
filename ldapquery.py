@@ -47,7 +47,7 @@ def lookup():
     args = request.args
     filter = buildFilter(args)
     if not filter:
-        return jsonify({'error': f'Please specify the conditions: {filters}'}), 400
+        return jsonify({'error': f'Please specify the conditions: {filters}'}), 400, {'Content-Type': 'application/json;charset=UTF-8'}
 
      # Set up the server connection
     server = Server(LDAP_SERVER, get_info=ALL)
@@ -64,9 +64,9 @@ def lookup():
         result.append(vals)
 
     if result:
-        return jsonify(result), 200
+        return jsonify(result), 200, {'Content-Type': 'application/json;charset=UTF-8'}
     else:
-        return jsonify({'error': 'account is not found'}), 404
+        return jsonify({'error': 'account is not found'}), 404, {'Content-Type': 'application/json;charset=UTF-8'}
 
 
 def main():
