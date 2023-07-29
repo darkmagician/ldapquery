@@ -20,20 +20,34 @@ LDAP_SERVER = getENV('LDAP_SERVER')
 LDAP_USER = getENV('LDAP_USER')
 LDAP_PASS = getENV('LDAP_PASS')
 LDAP_BASE = getENV('LDAP_BASE')
+SEARCH_LIMIT = getENV('SEARCH_LIMIT', 10)
 
+filters = ['cn', 'sAMAccountName', 'displayName', 'uid', 'mail']
 attributes = ['cn', 'sAMAccountName', 'displayName', 'uid', 'mail']
 
 app = Flask(__name__)
 app.config['JSON_AS_ASCII'] = False
 
 
+def buildFilter(args):
+    filter = None
+
+    for key in args:
+        if key in filters:
+            value = args[key]
+            if filter:
+                filter = f'(&{filter}({key}={value}))'
+            else:
+                filter = f'({key}={value})'
+    return filter
+
+
 @app.route("/account", methods=["GET"])
 def lookup():
     args = request.args
-    key = 'sAMAccountName'
-    value = args.get(key)
-    if not value:
-        return jsonify({'error': f'Please specify the {key}'}), 400
+    filter = buildFilter(args)
+    if not filter:
+        return jsonify({'error': f'Please specify the conditions: {filters}'}), 400
 
      # Set up the server connection
     server = Server(LDAP_SERVER, get_info=ALL)
@@ -41,9 +55,9 @@ def lookup():
     conn.open()
     conn.bind()
     # Perform the search
-    conn.search(LDAP_BASE, f'({key}={value})', attributes=attributes)
-    print(f'({key}={value})')
-    print(f'({LDAP_USER})')
+    print('pppp' + filter)
+    conn.search(LDAP_BASE, filter, attributes=attributes, size_limit=SEARCH_LIMIT)
+
     result = []
     for entry in conn.entries:
         vals = entry.entry_attributes_as_dict
