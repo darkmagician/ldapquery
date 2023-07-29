@@ -26,7 +26,10 @@ filters = ['cn', 'sAMAccountName', 'displayName', 'uid', 'mail']
 attributes = ['cn', 'sAMAccountName', 'displayName', 'uid', 'mail']
 
 app = Flask(__name__)
-app.config['JSON_AS_ASCII'] = False
+# flask ver<2.3
+#app.config['JSON_AS_ASCII'] = False
+# flask ver>=2.3
+json.provider.DefaultJSONProvider.ensure_ascii = False
 
 
 def buildFilter(args):
