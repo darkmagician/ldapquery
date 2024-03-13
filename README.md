@@ -69,7 +69,7 @@ LDAP_BASE=xxxx
 start docker
 
 ```
-docker run -d --net=host --env-file=env.txt ldapquery
+docker run -d --restart always --net=host --name ldapquery --env-file=env.txt ldapquery
 ```
 
 
