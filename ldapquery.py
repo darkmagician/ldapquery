@@ -25,9 +25,10 @@ LDAP_BASE = getENV('LDAP_BASE')
 SEARCH_LIMIT = getENV('SEARCH_LIMIT', 10)
 
 filters = ['cn', 'sAMAccountName', 'displayName', 'uid', 'mail']
-attributes = ['cn', 'sAMAccountName', 'displayName', 'uid', 'mail']
+attributes = ['cn', 'sAMAccountName', 'displayName', 'uid', 'mail', 'userAccountControl']
 
 app = Flask(__name__)
+app.config['JSONIFY_PRETTYPRINT_REGULAR'] = True
 # flask ver<2.3
 #app.config['JSON_AS_ASCII'] = False
 # flask ver>=2.3
@@ -45,6 +46,48 @@ def buildFilter(args):
             else:
                 filter = f'({key}={value})'
     return filter
+
+
+UserAccountControl_DEF = {
+    "SCRIPT": 0x0001,
+    "ACCOUNTDISABLE": 0x0002,
+    "HOMEDIR_REQUIRED": 0x0008,
+    "LOCKOUT": 0x0010,
+    "PASSWD_NOTREQD": 0x0020,
+    "PASSWD_CANT_CHANGE": 0x0040,
+    "ENCRYPTED_TEXT_PWD_ALLOWED": 0x0080,
+    "TEMP_DUPLICATE_ACCOUNT": 0x0100,
+    "NORMAL_ACCOUNT": 0x0200,
+    "INTERDOMAIN_TRUST_ACCOUNT": 0x0800,
+    "WORKSTATION_TRUST_ACCOUNT": 0x1000,
+    "SERVER_TRUST_ACCOUNT": 0x2000,
+    "DONT_EXPIRE_PASSWORD": 0x10000,
+    "MNS_LOGON_ACCOUNT": 0x20000,
+    "SMARTCARD_REQUIRED": 0x40000,
+    "TRUSTED_FOR_DELEGATION": 0x80000,
+    "NOT_DELEGATED": 0x100000,
+    "USE_DES_KEY_ONLY": 0x200000,
+    "DONT_REQ_PREAUTH": 0x400000,
+    "PASSWORD_EXPIRED": 0x800000,
+    "TRUSTED_TO_AUTH_FOR_DELEGATION": 0x1000000,
+    "PARTIAL_SECRETS_ACCOUNT": 0x04000000
+
+
+}
+
+
+def doTranlsateUserAccountControl(raw):
+    val = {"raw": raw}
+    for key, value in UserAccountControl_DEF.items():
+        val[key] = (raw & value) > 0
+    return val
+
+
+def tranlsateUserAccountControl(raw):
+    if isinstance(raw, list):
+        return [doTranlsateUserAccountControl(item) for item in raw]
+    else:
+        return doTranlsateUserAccountControl(raw)
 
 
 @app.route("/account", methods=["GET"])
@@ -66,6 +109,8 @@ def lookup():
         result = []
         for entry in conn.entries:
             vals = entry.entry_attributes_as_dict
+            if 'userAccountControl' in vals:
+                vals['userAccountControl'] = tranlsateUserAccountControl(vals['userAccountControl'])
             result.append(vals)
 
         if result:
