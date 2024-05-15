@@ -178,7 +178,7 @@ def gradio_lookup(query_type, query_value):
 
 
 def launch_gradio():
-    demo = gr.Interface(fn=gradio_lookup,
+    demo = gr.Interface(fn=gradio_lookup, title="Query LDAP Users",
                         inputs=[gr.Radio(filters, label="LDAP Attributes", info="Please specify the query attribute"),
                                 gr.Textbox(label="Attribute Value")],
                         outputs=[gr.JSON(label="Query Result")])
