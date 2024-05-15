@@ -5,6 +5,8 @@ from flask import Flask
 from flask import json
 import traceback
 import os
+import threading
+import gradio as gr
 
 
 def getENV(key, defaultVal=None):
@@ -18,6 +20,7 @@ def getENV(key, defaultVal=None):
 
 # Environments
 HTTP_PORT = getENV('HTTP_PORT', 4084)
+GRADIO_HTTP_PORT = getENV('GRADIO_HTTP_PORT', 4085)
 LDAP_SERVER = getENV('LDAP_SERVER')
 LDAP_USER = getENV('LDAP_USER')
 LDAP_PASS = getENV('LDAP_PASS')
@@ -30,7 +33,7 @@ attributes = ['cn', 'sAMAccountName', 'displayName', 'uid', 'mail', 'userAccount
 app = Flask(__name__)
 app.config['JSONIFY_PRETTYPRINT_REGULAR'] = True
 # flask ver<2.3
-#app.config['JSON_AS_ASCII'] = False
+# app.config['JSON_AS_ASCII'] = False
 # flask ver>=2.3
 json.provider.DefaultJSONProvider.ensure_ascii = False
 
@@ -90,20 +93,13 @@ def tranlsateUserAccountControl(raw):
         return doTranlsateUserAccountControl(raw)
 
 
-@app.route("/account", methods=["GET"])
-def lookup():
-    args = request.args
-    filter = buildFilter(args)
-    if not filter:
-        return jsonify({'error': f'Please specify the conditions: {filters}'}), 400, {'Content-Type': 'application/json;charset=UTF-8'}
-
-     # Set up the server connection
+def do_query(filter):
     server = Server(LDAP_SERVER, get_info=ALL)
     with Connection(server, user=LDAP_USER, password=LDAP_PASS) as conn:
         conn.open()
         conn.bind()
         # Perform the search
-        #print('pppp' + filter)
+        # print('pppp' + filter)
         conn.search(LDAP_BASE, filter, attributes=attributes, size_limit=SEARCH_LIMIT)
 
         result = []
@@ -112,11 +108,23 @@ def lookup():
             if 'userAccountControl' in vals:
                 vals['userAccountControl'] = tranlsateUserAccountControl(vals['userAccountControl'])
             result.append(vals)
+    return result
 
-        if result:
-            return jsonify(result), 200, {'Content-Type': 'application/json;charset=UTF-8'}
-        else:
-            return jsonify({'error': 'account is not found'}), 404, {'Content-Type': 'application/json;charset=UTF-8'}
+
+@app.route("/account", methods=["GET"])
+def lookup():
+    args = request.args
+    filter = buildFilter(args)
+    if not filter:
+        return jsonify({'error': f'Please specify the conditions: {filters}'}), 400, {'Content-Type': 'application/json;charset=UTF-8'}
+
+     # Set up the server connection
+
+    result = do_query(filter)
+    if result:
+        return jsonify(result), 200, {'Content-Type': 'application/json;charset=UTF-8'}
+    else:
+        return jsonify({'error': 'account is not found'}), 404, {'Content-Type': 'application/json;charset=UTF-8'}
 
 
 @app.route("/auth", methods=["POST"])
@@ -153,8 +161,35 @@ def changepw():
         return jsonify({'operation': 'failed'}), 400, {'Content-Type': 'application/json;charset=UTF-8'}
 
 
-def main():
+def startFlask():
     app.run(host="0.0.0.0", port=HTTP_PORT)
+
+
+def gradio_lookup(query_type, query_value):
+    args = {query_type: query_value}
+    filter = buildFilter(args)
+    if not filter:
+        return {'error': f'Please specify the conditions: {filters}'}
+    result = do_query(filter)
+    if result:
+        return result
+    else:
+        return {'error': 'account is not found'}
+
+
+def launch_gradio():
+    demo = gr.Interface(fn=gradio_lookup,
+                        inputs=[gr.Radio(filters, label="LDAP Attributes", info="Please specify the query attribute"),
+                                gr.Textbox(label="Attribute Value")],
+                        outputs=[gr.JSON(label="Query Result")])
+    demo.launch(server_name="0.0.0.0", server_port=GRADIO_HTTP_PORT)
+
+
+def main():
+    daemon_thread = threading.Thread(target=startFlask)
+    daemon_thread.daemon = True
+    daemon_thread.start()
+    launch_gradio()
 
 
 if __name__ == '__main__':
